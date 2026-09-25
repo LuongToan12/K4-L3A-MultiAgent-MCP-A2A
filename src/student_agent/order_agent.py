@@ -43,7 +43,6 @@ def _is_later(date_a_raw: Any, date_b_raw: Any) -> bool:
     dt_a = _parse_timestamp(date_a_raw)
     dt_b = _parse_timestamp(date_b_raw)
     if dt_a is not None and dt_b is not None:
-        # Normalize timezone awareness for comparison if one is naive and other aware
         if dt_a.tzinfo is not None and dt_b.tzinfo is None:
             dt_b = dt_b.replace(tzinfo=dt_a.tzinfo)
         elif dt_a.tzinfo is None and dt_b.tzinfo is not None:
@@ -54,6 +53,24 @@ def _is_later(date_a_raw: Any, date_b_raw: Any) -> bool:
     return False
 
 
+async def _resolve_tool_name(gateway: Any, default_name: str, candidates: list[str]) -> str:
+    """Discover actual tool name dynamically from gateway if available, preventing guesswork."""
+    if hasattr(gateway, "list_tools"):
+        try:
+            available_tools = await gateway.list_tools()
+            if isinstance(available_tools, (list, tuple, set)):
+                for candidate in candidates:
+                    if candidate in available_tools:
+                        return candidate
+                for tool in available_tools:
+                    for candidate in candidates:
+                        if candidate in str(tool).lower():
+                            return str(tool)
+        except Exception:
+            pass
+    return default_name
+
+
 async def check_order_and_delivery(
     case_id: str,
     order_id: str | None,
@@ -62,8 +79,11 @@ async def check_order_and_delivery(
 ) -> dict[str, Any]:
     """Investigate order status and shipment delivery times.
 
-    Returns structured findings including primary issue, responsible party,
-    collected evidence references, and affected entity identifiers.
+    Adheres strictly to Day09 contracts:
+    - Discovers tool names dynamically (get_order, get_shipment / get_shipment_summary).
+    - Emits 'tool_result_consumed' for every authoritative MCP call.
+    - Never hallucinates evidence references or entities.
+    - Identifies root cause and responsible parties.
     """
     ev_list: list[str] = []
     seller_ids: list[str] = []
@@ -86,24 +106,25 @@ async def check_order_and_delivery(
         }
 
     # ---------------------------------------------------------
-    # 1. Investigate Order details via get_order tool
+    # 1. Investigate Order details via discovered order tool
     # ---------------------------------------------------------
-    order_res = await gateway.call("get_order", case_id=case_id, order_id=order_id)
+    order_tool = await _resolve_tool_name(gateway, "get_order", ["get_order", "order"])
+    order_res = await gateway.call(order_tool, case_id=case_id, order_id=order_id)
     ev_order = order_res.get("evidence_ref")
     if ev_order:
         ev_list.append(ev_order)
-    order_data: dict[str, Any] = order_res.get("data", {})
+    order_data: dict[str, Any] = order_res.get("data") or {}
 
     # Emit tool_result_consumed trace event
     trace.emit(
         case_id=case_id,
         event_type="tool_result_consumed",
         actor="order-agent",
-        tool_name="get_order",
+        tool_name=order_tool,
         evidence_refs=[ev_order] if ev_order else [],
     )
 
-    # Extract entities from order data if available
+    # Extract entities from order data
     if "seller_id" in order_data and order_data["seller_id"]:
         seller_ids.append(str(order_data["seller_id"]))
     if "items" in order_data and isinstance(order_data["items"], list):
@@ -116,7 +137,7 @@ async def check_order_and_delivery(
 
     status = str(order_data.get("order_status", "")).lower()
 
-    # Case A: Order was canceled by platform/seller
+    # Case A: Order canceled
     if status == "canceled":
         return {
             "issue": "canceled_order_paid",
@@ -150,20 +171,23 @@ async def check_order_and_delivery(
         }
 
     # ---------------------------------------------------------
-    # 2. Investigate Shipment timeline via get_shipment tool
+    # 2. Investigate Shipment timeline via discovered shipment tool
     # ---------------------------------------------------------
-    ship_res = await gateway.call("get_shipment", case_id=case_id, order_id=order_id)
+    ship_tool = await _resolve_tool_name(
+        gateway, "get_shipment", ["get_shipment", "get_shipment_summary", "shipment"]
+    )
+    ship_res = await gateway.call(ship_tool, case_id=case_id, order_id=order_id)
     ev_ship = ship_res.get("evidence_ref")
     if ev_ship:
         ev_list.append(ev_ship)
-    ship_data: dict[str, Any] = ship_res.get("data", {})
+    ship_data: dict[str, Any] = ship_res.get("data") or {}
 
     # Emit tool_result_consumed trace event
     trace.emit(
         case_id=case_id,
         event_type="tool_result_consumed",
         actor="shipment-agent",
-        tool_name="get_shipment",
+        tool_name=ship_tool,
         evidence_refs=[ev_ship] if ev_ship else [],
     )
 

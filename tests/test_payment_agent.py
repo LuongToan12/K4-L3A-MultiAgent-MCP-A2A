@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+from pathlib import Path
 from typing import Any
-import pytest
 
+from student_agent.contracts import Contracts
 from student_agent.payment_agent import check_payment_and_refund
+from student_agent.trace import TraceWriter
 
 
 class DummyTrace:
@@ -16,7 +19,11 @@ class DummyTrace:
 
 
 class DummyGateway:
-    def __init__(self, data: dict[str, Any], evidence_ref: str = "ev_test_12345678901234567890") -> None:
+    def __init__(
+        self,
+        data: dict[str, Any],
+        evidence_ref: str = "ev_test_12345678901234567890",
+    ) -> None:
         self.data = data
         self.evidence_ref = evidence_ref
         self.calls: list[dict[str, Any]] = []
@@ -34,7 +41,11 @@ def test_single_payment() -> None:
         gateway = DummyGateway(
             data={
                 "payments": [
-                    {"payment_sequential": 1, "payment_type": "credit_card", "payment_value": 150.50}
+                    {
+                        "payment_sequential": 1,
+                        "payment_type": "credit_card",
+                        "payment_value": 150.50,
+                    }
                 ]
             },
             evidence_ref="ev_pay_single_123456789012345678",
@@ -58,7 +69,6 @@ def test_single_payment() -> None:
         assert trace.events[1]["actor"] == "policy-agent"
         assert trace.events[1]["decision_code"] == "REFUND_POLICY_EVALUATED"
 
-    import asyncio
     asyncio.run(_test())
 
 
@@ -67,8 +77,16 @@ def test_duplicate_charge() -> None:
         gateway = DummyGateway(
             data={
                 "payments": [
-                    {"payment_sequential": 1, "payment_type": "credit_card", "payment_value": 99.99},
-                    {"payment_sequential": 2, "payment_type": "credit_card", "payment_value": 99.99},
+                    {
+                        "payment_sequential": 1,
+                        "payment_type": "credit_card",
+                        "payment_value": 99.99,
+                    },
+                    {
+                        "payment_sequential": 2,
+                        "payment_type": "credit_card",
+                        "payment_value": 99.99,
+                    },
                 ]
             },
             evidence_ref="ev_pay_dup_12345678901234567890",
@@ -82,7 +100,6 @@ def test_duplicate_charge() -> None:
         assert result["payment_refs"] == ["1", "2"]
         assert result["ev"] == ["ev_pay_dup_12345678901234567890"]
 
-    import asyncio
     asyncio.run(_test())
 
 
@@ -91,8 +108,16 @@ def test_split_payment_different_amounts() -> None:
         gateway = DummyGateway(
             data={
                 "payments": [
-                    {"payment_sequential": 1, "payment_type": "voucher", "payment_value": 20.00},
-                    {"payment_sequential": 2, "payment_type": "credit_card", "payment_value": 80.00},
+                    {
+                        "payment_sequential": 1,
+                        "payment_type": "voucher",
+                        "payment_value": 20.00,
+                    },
+                    {
+                        "payment_sequential": 2,
+                        "payment_type": "credit_card",
+                        "payment_value": 80.00,
+                    },
                 ]
             },
             evidence_ref="ev_pay_split_123456789012345678",
@@ -105,16 +130,10 @@ def test_split_payment_different_amounts() -> None:
         assert result["is_duplicate"] is False
         assert result["payment_refs"] == ["1", "2"]
 
-    import asyncio
     asyncio.run(_test())
 
 
 def test_payment_agent_with_real_contracts_and_tracewriter(tmp_path: Any) -> None:
-    from pathlib import Path
-    import asyncio
-    from student_agent.contracts import Contracts
-    from student_agent.trace import TraceWriter
-
     root = Path(__file__).resolve().parents[1]
     contracts = Contracts(root / "contracts" / "schemas")
     trace_path = tmp_path / "traces" / "trace.jsonl"
@@ -124,7 +143,11 @@ def test_payment_agent_with_real_contracts_and_tracewriter(tmp_path: Any) -> Non
         gateway = DummyGateway(
             data={
                 "payments": [
-                    {"payment_sequential": 1, "payment_type": "credit_card", "payment_value": 45.67}
+                    {
+                        "payment_sequential": 1,
+                        "payment_type": "credit_card",
+                        "payment_value": 45.67,
+                    }
                 ]
             },
             evidence_ref="ev_pay_realtrace_12345678901234",
@@ -137,4 +160,3 @@ def test_payment_agent_with_real_contracts_and_tracewriter(tmp_path: Any) -> Non
         assert len(lines) == 2
 
     asyncio.run(_test())
-
