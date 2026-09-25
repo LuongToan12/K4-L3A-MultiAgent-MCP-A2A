@@ -17,9 +17,9 @@ Input → Coordinator → Specialists → Verifier → Output
 | Actor | Input | Trách nhiệm | Output/handoff |
 | --- | --- | --- | --- |
 | Coordinator | TODO | TODO | TODO |
-| Order/item | TODO | TODO | TODO |
+| Order/item | `case_id`, `order_id` | Gọi tool `get_order`, xác định trạng thái đơn (`canceled`, `unavailable`), trích xuất `seller_id`, `item_ids` | Trả về thông tin đơn hàng, `ev_order` và kết quả đánh giá đơn hàng |
 | Payment | TODO | TODO | TODO |
-| Shipment | TODO | TODO | TODO |
+| Shipment | `case_id`, `order_id` | Gọi tool `get_shipment`, so khớp `order_delivered_carrier_date` vs `shipping_limit_date` và `order_delivered_customer_date` vs `order_estimated_delivery_date` | Trả về `ev_ship`, phân định bên trễ hạn (`seller` hay `logistics_provider`) |
 | Policy | TODO | TODO | TODO |
 | Verifier | TODO | TODO | TODO |
 
