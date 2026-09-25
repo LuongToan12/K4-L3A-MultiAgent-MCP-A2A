@@ -37,7 +37,7 @@ Không code dàn trải hay over-engineer. Tập trung ăn trọn các đầu đ
 
 ```
                             ┌────────────────┐
-                            │   COORDINATOR  │ (TV1 - Bạn)
+                            │   COORDINATOR  │ (TV1)
                             └───────┬────────┘
                     task_assigned   │
                                     ▼
@@ -54,7 +54,7 @@ Không code dàn trải hay over-engineer. Tập trung ăn trọn các đầu đ
                                     │ handoff
                                     ▼
                             ┌────────────────┐
-                            │    VERIFIER    │ (TV1 - Bạn)
+                            │    VERIFIER    │ (TV1)
                             └────────────────┘
 ```
 
@@ -230,7 +230,7 @@ async def check_payment_and_refund(case_id: str, order_id: str, gateway: Any, tr
 
 ---
 
-### 👤 THÀNH VIÊN 1 (BẠN): Team Lead & Workflow Orchestrator
+### 👤 THÀNH VIÊN 1: Team Lead & Workflow Orchestrator
 > **Mục tiêu:** Kết nối các agent tại [`src/student_agent/workflow.py`](src/student_agent/workflow.py) và xuất output đạt chuẩn JSON schema.
 
 * **File chỉnh sửa:** [`src/student_agent/workflow.py`](src/student_agent/workflow.py)
