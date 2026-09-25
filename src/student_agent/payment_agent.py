@@ -11,7 +11,13 @@ async def check_payment_and_refund(
     Interacts with the MCP Gateway 'get_payment' tool to inspect payment
     records, detects duplicate charges, and calculates total paid amount.
     """
-    pay_res = await gateway.call("get_payment", case_id=case_id, order_id=order_id)
+    tool_name = "get_order_payments"
+    try:
+        pay_res = await gateway.call("get_order_payments", case_id=case_id, order_id=order_id)
+    except Exception:
+        tool_name = "get_payment"
+        pay_res = await gateway.call("get_payment", case_id=case_id, order_id=order_id)
+
     ev_pay = pay_res["evidence_ref"]
     pay_data = pay_res.get("data") or {}
 
@@ -20,7 +26,7 @@ async def check_payment_and_refund(
         case_id=case_id,
         event_type="tool_result_consumed",
         actor="payment-agent",
-        tool_name="get_payment",
+        tool_name=tool_name,
         evidence_refs=[ev_pay],
     )
 

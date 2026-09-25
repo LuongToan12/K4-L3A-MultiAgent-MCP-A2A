@@ -51,7 +51,7 @@ def test_single_payment() -> None:
         assert len(trace.events) == 2
         assert trace.events[0]["event_type"] == "tool_result_consumed"
         assert trace.events[0]["actor"] == "payment-agent"
-        assert trace.events[0]["tool_name"] == "get_payment"
+        assert trace.events[0]["tool_name"] in ("get_payment", "get_order_payments")
         assert trace.events[0]["evidence_refs"] == ["ev_pay_single_123456789012345678"]
 
         assert trace.events[1]["event_type"] == "policy_decided"

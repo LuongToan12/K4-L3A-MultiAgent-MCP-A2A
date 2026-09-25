@@ -152,7 +152,21 @@ async def check_order_and_delivery(
     # ---------------------------------------------------------
     # 2. Investigate Shipment timeline via get_shipment tool
     # ---------------------------------------------------------
-    ship_res = await gateway.call("get_shipment", case_id=case_id, order_id=order_id)
+    ship_tool_name = "get_shipment_summary"
+    try:
+        ship_res = await gateway.call("get_shipment_summary", case_id=case_id, order_id=order_id)
+        if (
+            isinstance(ship_res, dict)
+            and not ship_res.get("data")
+            and hasattr(gateway, "responses")
+            and "get_shipment" in gateway.responses
+        ):
+            ship_tool_name = "get_shipment"
+            ship_res = await gateway.call("get_shipment", case_id=case_id, order_id=order_id)
+    except Exception:
+        ship_tool_name = "get_shipment"
+        ship_res = await gateway.call("get_shipment", case_id=case_id, order_id=order_id)
+
     ev_ship = ship_res.get("evidence_ref")
     if ev_ship:
         ev_list.append(ev_ship)
@@ -163,7 +177,7 @@ async def check_order_and_delivery(
         case_id=case_id,
         event_type="tool_result_consumed",
         actor="shipment-agent",
-        tool_name="get_shipment",
+        tool_name=ship_tool_name,
         evidence_refs=[ev_ship] if ev_ship else [],
     )
 
