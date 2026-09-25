@@ -6,14 +6,23 @@ from typing import Any
 from student_agent.order_agent import (
     _is_later,
     _parse_timestamp,
+    _resolve_tool_name,
     check_order_and_delivery,
 )
 
 
 class MockGateway:
-    def __init__(self, responses: dict[str, dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        responses: dict[str, dict[str, Any]],
+        tools: list[str] | None = None,
+    ) -> None:
         self.responses = responses
+        self.tools = tools or ["get_order", "get_shipment"]
         self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def list_tools(self) -> list[str]:
+        return self.tools
 
     async def call(self, tool_name: str, **kwargs: Any) -> dict[str, Any]:
         self.calls.append((tool_name, kwargs))
@@ -55,6 +64,19 @@ def test_is_later() -> None:
     assert _is_later("2018-05-09 10:00:00", "2018-05-09 10:00:00") is False
     assert _is_later(None, "2018-05-09 10:00:00") is False
     assert _is_later("2018-05-09 10:00:00", None) is False
+
+
+def test_tool_discovery() -> None:
+    gateway = MockGateway({}, tools=["custom_get_order", "get_shipment_summary"])
+    resolved_order = asyncio.run(
+        _resolve_tool_name(gateway, "get_order", ["get_order", "order"])
+    )
+    resolved_shipment = asyncio.run(
+        _resolve_tool_name(gateway, "get_shipment", ["get_shipment_summary", "shipment"])
+    )
+
+    assert resolved_order == "custom_get_order"
+    assert resolved_shipment == "get_shipment_summary"
 
 
 def test_missing_order_id() -> None:
@@ -137,7 +159,7 @@ def test_late_delivery_seller() -> None:
                 "evidence_ref": "ev_ship_test_late_seller_222",
                 "data": {
                     "shipping_limit_date": "2018-05-02 12:00:00",
-                    "order_delivered_carrier_date": "2018-05-05 15:00:00",  # 3 days late
+                    "order_delivered_carrier_date": "2018-05-05 15:00:00",
                     "order_delivered_customer_date": "2018-05-10 10:00:00",
                     "order_estimated_delivery_date": "2018-05-15 00:00:00",
                     "tracking_number": "TRK_003",
@@ -168,9 +190,9 @@ def test_late_delivery_logistics() -> None:
                 "evidence_ref": "ev_ship_test_late_logistics_222",
                 "data": {
                     "shipping_limit_date": "2018-05-05 12:00:00",
-                    "order_delivered_carrier_date": "2018-05-03 10:00:00",  # Seller was on time
-                    "order_delivered_customer_date": "2018-05-20 18:00:00",  # Delivered on May 20
-                    "order_estimated_delivery_date": "2018-05-15 00:00:00",  # Expected May 15
+                    "order_delivered_carrier_date": "2018-05-03 10:00:00",
+                    "order_delivered_customer_date": "2018-05-20 18:00:00",
+                    "order_estimated_delivery_date": "2018-05-15 00:00:00",
                 },
             },
         }
